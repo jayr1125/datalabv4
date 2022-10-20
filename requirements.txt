@@ -12,3 +12,4 @@ openpyxl
 ipywidgets
 ruptures
 darts
+pydeck==0.7.1
