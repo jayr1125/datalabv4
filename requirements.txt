@@ -3,9 +3,6 @@ aiohttp==3.8.1
 aiosignal==1.2.0
 alabaster==0.7.12
 altair==4.2.0
-anaconda-client==1.9.0
-anaconda-navigator==2.1.1
-anaconda-project==0.10.1
 anyio==2.2.0
 appdirs==1.4.4
 arch==5.3.1
@@ -54,14 +51,6 @@ cmdstanpy==1.0.7
 colorama==0.4.4
 commonmark==0.9.1
 comtypes==1.1.10
-conda==4.10.3
-conda-build==3.21.6
-conda-content-trust==0+unknown
-conda-pack==0.6.0
-conda-package-handling==1.7.3
-conda-repo-cli==1.0.4
-conda-token==0.3.0
-conda-verify==3.4.2
 contextlib2==0.6.0.post1
 contourpy==1.0.5
 convertdate==2.4.0
