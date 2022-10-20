@@ -14,3 +14,4 @@ ruptures
 darts
 pydeck==0.7.1
 pyarrow==9.0.0
+pip==20.0
