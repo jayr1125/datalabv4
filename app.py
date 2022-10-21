@@ -696,7 +696,7 @@ try:
                       str(coint_feat),
                       help="Cointegrated means that the two variables have a relationship/correlation in the long term.")
 
-except (NameError, IndexError, KeyError) as e:
+except (NameError, IndexError, KeyError, ValueError) as e:
     pass
 
 print("Done Rendering Application!")
