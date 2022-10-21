@@ -6,12 +6,11 @@ statsmodels==0.13.2
 scikit-learn==1.0.2
 protobuf==3.19.0
 streamlit==1.12.0
-arch
-pycaret-ts-alpha
-openpyxl
-ipywidgets
-ruptures
-darts
+arch==5.3.1
+openpyxl==3.0.9
+ipywidgets==7.6.5
+ruptures==1.1.7
+darts==0.21.0
 pydeck==0.7.1
 pyarrow==9.0.0
 pip==19.0.0
