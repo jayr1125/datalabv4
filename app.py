@@ -424,8 +424,9 @@ try:
             if correlation_mode == 'Auto':
                 pos_lag = find_best_lag(data_df1_series, chosen_target1, feat)[0]
                 neg_lag = find_best_lag(data_df1_series, chosen_target1, feat)[1]
-                st.caption(f"Use lag = {pos_lag} for best positive correlation "
-                           f"and lag = {neg_lag} for best negative correlation")
+                st.markdown(f"<b><i>Use lag = {pos_lag} for best positive correlation "
+                            f"and lag = {neg_lag} for best negative correlation</b></i>",
+                            unsafe_allow_html=True)
 
             if feat == chosen_target1:
                 name = "Autocorrelation"
