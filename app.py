@@ -21,7 +21,7 @@ start = time.time()
 st.set_page_config(layout="wide")
 
 # Display FLNT logo
-image = Image.open("flnt.png")
+image = Image.open(r"C:\Users\jrsal\Pictures\flnt.png")
 st.sidebar.image(image,
                  width=230)
 
@@ -420,10 +420,11 @@ try:
                 data_name = f"Shifted {feat}"
             else:
                 data_name = feat
-                
+
             if correlation_mode == 'Auto':
                 pos_lag = find_best_lag(data_df1_series, chosen_target1, feat)[0]
                 neg_lag = find_best_lag(data_df1_series, chosen_target1, feat)[1]
+
                 if feat == chosen_target1:
                     st.markdown(f"<b><i>Use lag = {neg_lag} for best negative correlation</b></i>",
                                 unsafe_allow_html=True)
@@ -457,23 +458,22 @@ try:
         train_part = round(data_shape * 0.7)
         train = data_df1_series[:train_part]
         test = data_df1_series[train_part:]
-        X_train = train[chosen_features1]
+        X_train = train[train.columns.drop(chosen_target1)]
         y_train = train[chosen_target1].values
-        X_test = test[chosen_features1]
+        X_test = test[test.columns.drop(chosen_target1)]
         y_test = test[chosen_target1].values
-
         model = LinearRegression()
         model.fit(X_train, y_train)
         prediction = model.predict(X_test)
         model_coefficients = model.coef_
         model_intercept = model.intercept_
         sum_errors = np.sum((y_test - prediction) ** 2)
-        stdev = np.sqrt(1 / (len(y_test) - 2) * sum_errors)
-        interval = 1.96 * stdev
+        std = np.sqrt(1 / (len(y_test) - 2) * sum_errors)
+        interval = 1.96 * std
         y_lower1, y_upper1 = prediction - interval, prediction + interval
 
-        x_data1 = prediction.index
-        y_data1 = prediction.values
+        x_data1 = X_test.index
+        y_data1 = prediction
 
         st.write(f"Interpretation: The value of {chosen_target1} moves by {model_coefficients[0]} when the value of"
                  f" {chosen_features1[0]} moves by one quantity. In addition, {chosen_features1} moves by {model_coefficients[1]},"
