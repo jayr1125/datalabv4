@@ -424,7 +424,7 @@ try:
             if correlation_mode == 'Auto':
                 pos_lag = find_best_lag(data_df1_series, chosen_target1, feat)[0]
                 neg_lag = find_best_lag(data_df1_series, chosen_target1, feat)[1]
-                if len(chosen_features1) == 1:
+                if feat == chosen_target1:
                     st.markdown(f"<b><i>Use lag = {neg_lag} for best negative correlation</b></i>",
                                 unsafe_allow_html=True)
                 else:
