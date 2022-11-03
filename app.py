@@ -420,13 +420,17 @@ try:
                 data_name = f"Shifted {feat}"
             else:
                 data_name = feat
-
+                
             if correlation_mode == 'Auto':
                 pos_lag = find_best_lag(data_df1_series, chosen_target1, feat)[0]
                 neg_lag = find_best_lag(data_df1_series, chosen_target1, feat)[1]
-                st.markdown(f"<b><i>Use lag = {pos_lag} for best positive correlation "
-                            f"and lag = {neg_lag} for best negative correlation</b></i>",
-                            unsafe_allow_html=True)
+                if len(chosen_features1) == 1:
+                    st.markdown(f"<b><i>Use lag = {neg_lag} for best negative correlation</b></i>",
+                                unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<b><i>Use lag = {pos_lag} for best positive correlation "
+                                f"and lag = {neg_lag} for best negative correlation</b></i>",
+                                unsafe_allow_html=True)
 
             if feat == chosen_target1:
                 name = "Autocorrelation"
