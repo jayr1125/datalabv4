@@ -475,16 +475,16 @@ try:
         x_data1 = X_test.index
         y_data1 = prediction
 
-        st.write(f"Interpretation: The value of {chosen_target1} moves by {model_coefficients[0]} when the value of"
-                 f" {chosen_features1[0]} moves by one quantity. In addition, {chosen_features1} moves by {model_coefficients[1]},"
-                 f" when the value of {chosen_features1[1]} moves by a single quantity")
+        st.caption(f"Interpretation: The value of {chosen_target1} moves by {model_coefficients[0]} when the value of"
+                   f" {chosen_features1[0]} moves by one quantity. In addition, {chosen_features1} moves by {model_coefficients[1]},"
+                   f" when the value of {chosen_features1[1]} moves by a single quantity")
 
         # Forecast 1 plot
         fig5 = go.Figure()
         fig5.add_trace(go.Scatter(
             name="Data",
-            x=data_df1_series.index,
-            y=data_df1_series[chosen_target1]
+            x=X_train.index,
+            y=y_train
         ))
 
         fig5.add_trace(go.Scatter(
