@@ -475,9 +475,10 @@ try:
         x_data1 = X_test.index
         y_data1 = prediction
 
-        st.caption(f"Interpretation: The value of {chosen_target1} moves by {model_coefficients[0]} when the value of"
-                   f" {chosen_features1[0]} moves by one quantity. In addition, {chosen_features1} moves by {model_coefficients[1]},"
-                   f" when the value of {chosen_features1[1]} moves by a single quantity")
+        st.caption(f"Interpretation: The value of {chosen_target1} moves by a factor of {round(model_coefficients[0], 2)} "
+                   f"when the value of {chosen_features1[0]} moves by a single quantity. "
+                   f"In addition, {chosen_features1[1]} moves by a factor of {round(model_coefficients[1], 2)}, "
+                   f"when the value of {chosen_features1[1]} moves by a single quantity")
 
         # Forecast 1 plot
         fig5 = go.Figure()
