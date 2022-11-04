@@ -54,16 +54,16 @@ try:
         if val != object:
             targets1.append(key)
 
-    help_dependent = "Dependent variable is the effect. It is the value that you are trying to forecast"
-    help_independent = "Independent variable is the cause. It is the value which may contribute to the forecast"
-    chosen_target1 = st.sidebar.selectbox("Choose dependent variable",
+    help_dependent = "Target variable is the effect. It is the value that you are trying to forecast"
+    help_independent = "Explanatory variable is the cause. It is the value which may contribute to the forecast"
+    chosen_target1 = st.sidebar.selectbox("Choose target variable",
                                           targets1,
                                           help=help_dependent)
     features1 = list(data_df1_types.keys())
     features1.remove(chosen_target1)
     chosen_date1 = st.sidebar.selectbox("Choose date column to use",
                                         features1)
-    chosen_features1 = st.sidebar.multiselect("Choose independent variable(s) to use",
+    chosen_features1 = st.sidebar.multiselect("Choose explanatory variable(s) to use",
                                               features1,
                                               help=help_independent)
 
@@ -328,8 +328,9 @@ try:
                 if corr_res[0][1] < alpha:
                     res.append(corr_res)
 
-            best_positive_corr_lag = max(res)[1]
-            best_negative_corr_lag = min(res)[1]
+            res.sort()
+            best_positive_corr_lag = res[-2][1]
+            best_negative_corr_lag = res[0][1]
 
             return best_positive_corr_lag, best_negative_corr_lag
 
@@ -363,9 +364,9 @@ try:
 
         def useful(x):
             if x < 0.05:
-                return "Variable at this lag may be useful for prediction"
+                return "significant"
             else:
-                return "Variable at this lag is not useful for prediction"
+                return "insignificant"
 
         # Cross correlation plots
         def make_correlation_plot(
@@ -406,8 +407,8 @@ try:
                               paper_bgcolor="#2E3136",
                               plot_bgcolor="#2E3136",
                               colorway=["#7EE3C9", "#70B0E0"],
-                              title=f"{name}: {round(corr_user[0], 2)} ({strength(corr_user[0])}) "
-                                    f"| p-value: {round(corr_user[1], 3)} ({useful(corr_user[1])})")
+                              title=f"{name}: {round(corr_user[0], 2)} ({strength(corr_user[0])} "
+                                    f"and {useful(corr_user[1])})")
 
             st.plotly_chart(fig,
                             use_container_width=True)
@@ -425,13 +426,9 @@ try:
                 pos_lag = find_best_lag(data_df1_series, chosen_target1, feat)[0]
                 neg_lag = find_best_lag(data_df1_series, chosen_target1, feat)[1]
 
-                if feat == chosen_target1:
-                    st.markdown(f"<b><i>Use lag = {neg_lag} for best negative correlation</b></i>",
-                                unsafe_allow_html=True)
-                else:
-                    st.markdown(f"<b><i>Use lag = {pos_lag} for best positive correlation "
-                                f"and lag = {neg_lag} for best negative correlation</b></i>",
-                                unsafe_allow_html=True)
+                st.markdown(f"<b><i>Use lag = {pos_lag} for best positive correlation "
+                            f"and lag = {neg_lag} for best negative correlation</b></i>",
+                            unsafe_allow_html=True)
 
             if feat == chosen_target1:
                 name = "Autocorrelation"
@@ -454,84 +451,83 @@ try:
                                       name)
 
     with forecast_tab:
-        data_shape = data_df1_series.shape[0]
-        train_part = round(data_shape * 0.7)
-        train = data_df1_series[:train_part]
-        test = data_df1_series[train_part:]
-        X_train = train[train.columns.drop(chosen_target1)]
-        y_train = train[chosen_target1].values
-        X_test = test[test.columns.drop(chosen_target1)]
-        y_test = test[chosen_target1].values
-        model = LinearRegression()
-        model.fit(X_train, y_train)
-        prediction = model.predict(X_test)
-        model_coefficients = model.coef_
-        model_intercept = model.intercept_
-        sum_errors = np.sum((y_test - prediction) ** 2)
-        std = np.sqrt(1 / (len(y_test) - 2) * sum_errors)
-        interval = 1.96 * std
-        y_lower1, y_upper1 = prediction - interval, prediction + interval
+        # Create autoML model for forecasting
+        if st.button("Forecast"):
+            def modeling():
+                model = AutoTS(
+                    forecast_length=10,
+                    frequency='infer',
+                    prediction_interval=0.95,
+                    ensemble=None,
+                    model_list='fast',
+                    max_generations=10,
+                    num_validations=1,
+                    no_negatives=True
+                )
+                model = model.fit(data_df1_series)
+                return model
 
-        x_data1 = X_test.index
-        y_data1 = prediction
 
-        st.caption(f"Interpretation: The value of {chosen_target1} moves by a factor of {round(model_coefficients[0], 2)} "
-                   f"when the value of {chosen_features1[0]} moves by a single quantity. "
-                   f"In addition, {chosen_features1[1]} moves by a factor of {round(model_coefficients[1], 2)}, "
-                   f"when the value of {chosen_features1[1]} moves by a single quantity")
+            model = modeling()
+            model_name1 = model.best_model_name
+            prediction = model.predict()
 
-        # Forecast 1 plot
-        fig5 = go.Figure()
-        fig5.add_trace(go.Scatter(
-            name="Data",
-            x=X_train.index,
-            y=y_train
-        ))
+            x_data1 = prediction.forecast.index
+            y_data1 = prediction.forecast[chosen_target1].values
+            y_upper1 = prediction.upper_forecast[chosen_target1].values
+            y_lower1 = prediction.lower_forecast[chosen_target1].values
 
-        fig5.add_trace(go.Scatter(
-            name='Prediction',
-            x=x_data1,
-            y=y_data1,
-            # mode='lines',
-            line=dict(color='rgb(31, 119, 180)'),
-        ))
+            # Forecast 1 plot
+            fig5 = go.Figure()
+            fig5.add_trace(go.Scatter(
+                name="Data",
+                x=data_df1_series.index,
+                y=data_df1_series[chosen_target1]
+            ))
 
-        fig5.add_trace(go.Scatter(
-            name='Upper Bound',
-            x=x_data1,
-            y=y_upper1,
-            mode='lines',
-            marker=dict(color="#444"),
-            line=dict(width=0),
-            showlegend=False
-        ))
+            fig5.add_trace(go.Scatter(
+                name='Prediction',
+                x=x_data1,
+                y=y_data1,
+                # mode='lines',
+                line=dict(color='rgb(31, 119, 180)'),
+            ))
 
-        fig5.add_trace(go.Scatter(
-            name='Lower Bound',
-            x=x_data1,
-            y=y_lower1,
-            marker=dict(color="#70B0E0"),
-            line=dict(width=0),
-            mode='lines',
-            fillcolor='rgba(150, 150, 150, 0.3)',
-            fill='tonexty',
-            showlegend=False
-        ))
+            fig5.add_trace(go.Scatter(
+                name='Upper Bound',
+                x=x_data1,
+                y=y_upper1,
+                mode='lines',
+                marker=dict(color="#444"),
+                line=dict(width=0),
+                showlegend=False
+            ))
 
-        fig5.update_xaxes(gridcolor='grey')
-        fig5.update_yaxes(gridcolor='grey')
-        fig5.update_layout(xaxis_title=chosen_date1,
-                           yaxis_title=chosen_target1,
-                           font_color="white",
-                           paper_bgcolor="#2E3136",
-                           plot_bgcolor="#2E3136",
-                           title=f"{data1.name} Forecast using Linear Regression",
-                           hovermode="x",
-                           colorway=["#7EE3C9"])
+            fig5.add_trace(go.Scatter(
+                name='Lower Bound',
+                x=x_data1,
+                y=y_lower1,
+                marker=dict(color="#70B0E0"),
+                line=dict(width=0),
+                mode='lines',
+                fillcolor='rgba(150, 150, 150, 0.3)',
+                fill='tonexty',
+                showlegend=False
+            ))
 
-        st.plotly_chart(fig5,
-                        use_container_width=True)
+            fig5.update_xaxes(gridcolor='grey')
+            fig5.update_yaxes(gridcolor='grey')
+            fig5.update_layout(xaxis_title=chosen_date1,
+                               yaxis_title=chosen_target1,
+                               font_color="white",
+                               paper_bgcolor="#2E3136",
+                               plot_bgcolor="#2E3136",
+                               title=f"{data1.name} Forecast using {model_name1}",
+                               hovermode="x",
+                               colorway=["#7EE3C9"])
 
+            st.plotly_chart(fig5,
+                            use_container_width=True)
 
 except (NameError, IndexError, KeyError) as e:
     pass
