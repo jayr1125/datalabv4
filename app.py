@@ -459,7 +459,7 @@ try:
                     frequency='infer',
                     prediction_interval=0.95,
                     ensemble=None,
-                    model_list='fast',
+                    model_list=['VAR'],
                     max_generations=10,
                     num_validations=1,
                     no_negatives=True
