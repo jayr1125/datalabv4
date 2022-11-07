@@ -11,8 +11,8 @@ from statsmodels.stats.diagnostic import acorr_ljungbox
 from darts.utils.statistics import check_seasonality
 from darts import TimeSeries
 from scipy.stats import pearsonr
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures
+from statsmodels.tsa.api import VAR
+from statsmodels.tsa.arima.model import ARIMA
 
 # Start of execution time calculation
 start = time.time()
@@ -452,6 +452,11 @@ try:
 
     with forecast_tab:
         # Create autoML model for forecasting
+        if len(chosen_features1) > 1:
+            model_to_use = ['VAR']
+        else:
+            model_to_use = ['ARIMA']
+
         if st.button("Forecast"):
             def modeling():
                 model = AutoTS(
@@ -459,10 +464,11 @@ try:
                     frequency='infer',
                     prediction_interval=0.95,
                     ensemble=None,
-                    model_list=['VAR'],
-                    max_generations=10,
+                    model_list=model_to_use,
+                    max_generations=5,
                     num_validations=1,
-                    no_negatives=True
+                    no_negatives=True,
+                    random_seed=42
                 )
                 model = model.fit(data_df1_series)
                 return model
@@ -528,6 +534,37 @@ try:
 
             st.plotly_chart(fig5,
                             use_container_width=True)
+
+            if len(chosen_features1) > 1:
+                st.caption("Interpretation: The table below shows the lagged version of the target and explanatory variables (e.g., L1 means lag = 1), "
+                           "and their coefficients (how much they influence, positive or negative, the change in the target variable).")
+
+                mod = VAR(data_df1_series)
+                results = mod.fit(5)
+                coefs_lag_1 = results.coefs[0][-1]
+                coefs_lag_2 = results.coefs[1][-1]
+                coefs_lag_3 = results.coefs[2][-1]
+                coefs_lag_4 = results.coefs[3][-1]
+                coefs_lag_5 = results.coefs[4][-1]
+                coefs_all = np.vstack([coefs_lag_1, coefs_lag_2, coefs_lag_3, coefs_lag_4, coefs_lag_5]).reshape(-1,)
+                eqn = pd.DataFrame(zip(results.exog_names, coefs_all, results.pvalues[chosen_target1]),
+                                   columns=['Variables', 'Coefficients', 'Significance'])
+                eqn = eqn[1:]
+                eqn = eqn[eqn['Significance'] <= 0.05]
+                eqn.drop('Significance', axis=1, inplace=True)
+                st.write(eqn)
+            else:
+                st.caption("Interpretation: The table below shows the lagged version of the target variable(e.g., L1 means lag = 1), "
+                           "and their coefficients (how much they influence, positive or negative, the change in the target variable).")
+                st.caption("NOTE: AR means autoregressive or the lagged/past version of the variable itself.")
+                model_uni = ARIMA(data_df1_series, order=(5,0,1))
+                model_uni_fit = model_uni.fit()
+                eq = pd.DataFrame(zip(model_uni_fit.param_names, model_uni_fit.params.values, model_uni_fit.pvalues.values),
+                                  columns=['Variables', 'Coefficients', 'Significance'])
+                eq = eq[1:-1]
+                eq = eq[eq['Significance'] <= 0.05]
+                eq.drop('Significance', axis=1, inplace=True)
+                st.write(eq)
 
 except (NameError, IndexError, KeyError) as e:
     pass
