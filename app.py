@@ -12,7 +12,7 @@ from darts.utils.statistics import check_seasonality
 from darts import TimeSeries
 from scipy.stats import pearsonr
 from statsmodels.tsa.api import VAR
-from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.ardl import ARDL
 
 # Start of execution time calculation
 start = time.time()
@@ -21,7 +21,7 @@ start = time.time()
 st.set_page_config(layout="wide")
 
 # Display FLNT logo
-image = Image.open("flnt.png")
+image = Image.open(r"C:\Users\jrsal\Desktop\Migrated\Pictures\flnt.png")
 st.sidebar.image(image,
                  width=230)
 
@@ -454,9 +454,10 @@ try:
         # Create autoML model for forecasting
         if len(chosen_features1) > 1:
             model_to_use = ['VAR']
+            model_name1 = 'Vector Autoregression'
         else:
-            model_to_use = ['ARIMA']
-            st.warning("WARNING: ARIMA is a computationally expensive and iterative model. Modeling may take a while to finish (~4-5 minutes).")
+            model_to_use = ['ARDL']
+            model_name1 = 'Autoregression'
 
         if st.button("Forecast"):
             def modeling():
@@ -476,7 +477,7 @@ try:
 
 
             model = modeling()
-            model_name1 = model.best_model_name
+            #model_name1 = model.best_model_name
             prediction = model.predict()
 
             x_data1 = prediction.forecast.index
@@ -558,9 +559,9 @@ try:
                 st.caption("Interpretation: The table below shows the lagged version of the target variable(e.g., L1 means lag = 1), "
                            "and their coefficients (how much they influence, positive or negative, the change in the target variable).")
                 st.caption("NOTE: AR means autoregressive or the lagged/past version of the variable itself. While, MA means moving average.")
-                model_uni = ARIMA(data_df1_series, order=(5,0,1))
+                model_uni = ARDL(data_df1_series, lags=5)
                 model_uni_fit = model_uni.fit()
-                eq = pd.DataFrame(zip(model_uni_fit.param_names, model_uni_fit.params.values, model_uni_fit.pvalues.values),
+                eq = pd.DataFrame(zip(model_uni_fit.params.index, model_uni_fit.params.values, model_uni_fit.pvalues.values),
                                   columns=['Variables', 'Coefficients', 'Significance'])
                 eq = eq[1:-1]
                 eq = eq[eq['Significance'] <= 0.05]
