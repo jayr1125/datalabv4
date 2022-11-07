@@ -451,6 +451,7 @@ try:
                                       name)
 
     with forecast_tab:
+        st.warning("WARNING: ARIMA is a computationally expensive and iterative model. Modeling may take a while to finish (~4-5 minutes).")
         # Create autoML model for forecasting
         if len(chosen_features1) > 1:
             model_to_use = ['VAR']
