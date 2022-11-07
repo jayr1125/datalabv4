@@ -558,7 +558,6 @@ try:
             else:
                 st.caption("Interpretation: The table below shows the lagged version of the target variable(e.g., L1 means lag = 1), "
                            "and their coefficients (how much they influence, positive or negative, the change in the target variable).")
-                st.caption("NOTE: AR means autoregressive or the lagged/past version of the variable itself. While, MA means moving average.")
                 model_uni = ARDL(data_df1_series, lags=5)
                 model_uni_fit = model_uni.fit()
                 eq = pd.DataFrame(zip(model_uni_fit.params.index, model_uni_fit.params.values, model_uni_fit.pvalues.values),
