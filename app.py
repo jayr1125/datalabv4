@@ -554,6 +554,7 @@ try:
                 eqn = eqn[1:]
                 eqn = eqn[eqn['Significance'] <= 0.05]
                 eqn.drop('Significance', axis=1, inplace=True)
+                eqn.reset_index(drop=True, inplace=True)
                 st.write(eqn)
             else:
                 st.caption("Interpretation: The table below shows the lagged version of the target variable(e.g., L1 means lag = 1), "
@@ -565,6 +566,7 @@ try:
                 eq = eq[1:-1]
                 eq = eq[eq['Significance'] <= 0.05]
                 eq.drop('Significance', axis=1, inplace=True)
+                eq.reset_index(drop=True, inplace=True)
                 st.write(eq)
 
 except (NameError, IndexError, KeyError) as e:
