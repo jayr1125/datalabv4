@@ -13,6 +13,7 @@ from darts import TimeSeries
 from scipy.stats import pearsonr
 from statsmodels.tsa.api import VAR
 from statsmodels.tsa.ardl import ARDL
+from sklearn.impute import KNNImputer
 
 # Start of execution time calculation
 start = time.time()
@@ -42,9 +43,6 @@ try:
         else:
             data_df1 = pd.read_excel(data1)
 
-    # Impute missing values with mean
-    data_df1 = data_df1.fillna(data_df1.mean())
-
     # For choosing features and targets
     data_df1_types = data_df1.dtypes.to_dict()
 
@@ -63,9 +61,20 @@ try:
     features1.remove(chosen_target1)
     chosen_date1 = st.sidebar.selectbox("Choose date column to use",
                                         features1)
-    chosen_features1 = st.sidebar.multiselect("Choose explanatory variable(s) to use",
-                                              features1,
-                                              help=help_independent)
+
+
+    container = st.sidebar.container()
+    all = st.sidebar.checkbox("Select all features")
+
+    if all:
+        chosen_features1 = container.multiselect("Choose explanatory variable(s) to use",
+                                                 features1,
+                                                 features1,
+                                                 help=help_independent)
+    else:
+        chosen_features1 = container.multiselect("Choose explanatory variable(s) to use",
+                                                 features1,
+                                                 help=help_independent)
 
     # Create a dataframe based on chosen variables
     new_cols1 = chosen_features1.copy()
@@ -82,6 +91,14 @@ try:
 
     data_df1_series[chosen_date1] = pd.to_datetime(data_df1_series[chosen_date1],
                                                    dayfirst=True)
+
+    # Impute missing values
+    knn_imputer = KNNImputer(n_neighbors=3, weights='uniform')
+    data_imp_knn = knn_imputer.fit_transform(data_df1_series.drop('Date', axis=1))
+    data_imp_knn = pd.DataFrame(data_imp_knn, columns=data_df1_series.drop(chosen_date1, axis=1).columns)
+    data_imp_knn.insert(0, 'Date', data_df1_series[chosen_date1].values)
+
+    data_df1_series = data_imp_knn
 
     # data_df1_series with date column as datetime format (for darts time series input as dataframe)
     data_df1_series_dt = data_df1_series.copy()
@@ -320,11 +337,17 @@ try:
             :param alpha: value for significance threshold (default=0.05)
             :return:
             """
-            x = df[var1] - df[var1].shift(-1).fillna(df[var1].mean())
-            y = df[var2] - df[var2].shift(-1).fillna(df[var2].mean())
+            if stationarity_data1:
+                x = df[var1]
+                y = df[var2]
+            else:
+                x = df[var1] - df[var1].shift(-1)
+                y = df[var2] - df[var2].shift(-1)
             res = []
-            for i in range(df[var1].shape[0]):
-                corr_res = [pearsonr(x, y.shift(-i).fillna(y.mean())), i]
+            for i in range(df[var1].shape[0] - 1):
+                corr_res = [pearsonr(knn_imputer.fit_transform(x.values.reshape(-1, 1)).reshape(-1,),
+                                     knn_imputer.fit_transform(y.shift(periods=-1 * i).values.reshape(-1, 1)).reshape(-1,)),
+                            i]
                 if corr_res[0][1] < alpha:
                     res.append(corr_res)
 
@@ -343,14 +366,14 @@ try:
         ):
             if stationarity_data1:
                 # If data is stationary, compute the correlation coefficient directly
-                corr_user = pearsonr(df[target].fillna(0),
-                                     df[feature].shift(periods=-1 * period).fillna(0))
+                corr_user = pearsonr(df[target],
+                                     knn_imputer.fit_transform(df[feature].shift(periods=-1 * period).values.reshape(-1, 1)). reshape(-1,))
             else:
                 # Stationarize time series then calculate correlation
-                differenced_target = df[target] - df[target].shift(-1).fillna(df[target].mean())
-                differenced_feature = df[feature] - df[feature].shift(-1).fillna(df[feature].mean())
-                corr_user = pearsonr(differenced_target,
-                                     differenced_feature.shift(periods=-1 * period).fillna(differenced_feature.mean()))
+                differenced_target = df[target] - df[target].shift(-1)
+                differenced_feature = df[feature] - df[feature].shift(-1)
+                corr_user = pearsonr(knn_imputer.fit_transform(differenced_target.values.reshape(-1, 1)).reshape(-1,),
+                                     knn_imputer.fit_transform(differenced_feature.shift(periods=-1 * period).values.reshape(-1, 1)).reshape(-1,))
 
             return corr_user
 
@@ -452,12 +475,33 @@ try:
 
     with forecast_tab:
         # Create autoML model for forecasting
-        if len(chosen_features1) > 1:
-            model_to_use = ['VAR']
-            model_name1 = 'Vector Autoregression'
+        model_list = ['GLS',
+                      'GLM',
+                      'ARIMA',
+                      'VARMAX',
+                      'VECM',
+                      'VAR',
+                      'ARDL',
+                      'RollingRegression',
+                      'WindowRegression',
+                      'DatepartRegression',
+                      'MultivariateRegression',
+                      'UnivariateRegression']
+        model_selection = st.sidebar.selectbox("Model selection mode",
+                                               ['Auto', 'Manual'],
+                                               help="Choosing manual mode requires that you have knowledge on what "
+                                                    "model is appropriate for your dataset (e.g., univariate or"
+                                                    "multivariate)")
+        if model_selection == 'Manual':
+            model_to_use = st.sidebar.selectbox("Select model to use",
+                                                model_list)
         else:
-            model_to_use = ['ARDL']
-            model_name1 = 'Autoregression'
+            if len(chosen_features1) > 1:
+                model_to_use = 'VAR'
+                model_name1 = 'Vector Autoregression'
+            else:
+                model_to_use = 'ARDL'
+                model_name1 = 'Autoregression'
 
         if st.button("Forecast"):
             def modeling():
@@ -466,8 +510,8 @@ try:
                     frequency='infer',
                     prediction_interval=0.95,
                     ensemble=None,
-                    model_list=model_to_use,
-                    max_generations=10,
+                    model_list=[model_to_use],
+                    max_generations=5,
                     num_validations=1,
                     no_negatives=True,
                     random_seed=42
@@ -477,7 +521,7 @@ try:
 
 
             model = modeling()
-            #model_name1 = model.best_model_name
+            model_name1 = model.best_model_name
             prediction = model.predict()
 
             x_data1 = prediction.forecast.index
@@ -559,6 +603,7 @@ try:
             else:
                 st.caption("Interpretation: The table below shows the lagged version of the target variable(e.g., L1 means lag = 1), "
                            "and their coefficients (how much they influence, positive or negative, the change in the target variable).")
+                st.caption("NOTE: AR means autoregressive or the lagged/past version of the variable itself. While, MA means moving average.")
                 model_uni = ARDL(data_df1_series, lags=5)
                 model_uni_fit = model_uni.fit()
                 eq = pd.DataFrame(zip(model_uni_fit.params.index, model_uni_fit.params.values, model_uni_fit.pvalues.values),
