@@ -702,7 +702,7 @@ try:
             st.plotly_chart(fig,
                             use_container_width=True)
 
-except (NameError, IndexError, KeyError) as e:
+except (NameError, IndexError, KeyError, ValueError) as e:
     pass
 
 print("Done Rendering Application!")
