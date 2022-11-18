@@ -15,8 +15,8 @@ from statsmodels.tsa.api import VAR
 from statsmodels.tsa.ardl import ARDL
 from sklearn.impute import KNNImputer
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.feature_selection import RFE
 from sklearn.ensemble import ExtraTreesRegressor
+from plotly.subplots import make_subplots
 
 # Start of execution time calculation
 start = time.time()
@@ -96,9 +96,9 @@ try:
 
     # Impute missing values
     knn_imputer = KNNImputer(n_neighbors=3, weights='uniform')
-    data_imp_knn = knn_imputer.fit_transform(data_df1_series.drop('Date', axis=1))
+    data_imp_knn = knn_imputer.fit_transform(data_df1_series.drop(chosen_date1, axis=1))
     data_imp_knn = pd.DataFrame(data_imp_knn, columns=data_df1_series.drop(chosen_date1, axis=1).columns)
-    data_imp_knn.insert(0, 'Date', data_df1_series[chosen_date1].values)
+    data_imp_knn.insert(0, chosen_date1, data_df1_series[chosen_date1].values)
 
     data_df1_series = data_imp_knn
 
@@ -152,7 +152,6 @@ try:
         return dec.seasonal, dec.trend, dec.resid
 
     # Test for seasonality
-    @st.cache()
     def seasonality_test(
             df: pd.DataFrame,
             time_col: str,
@@ -192,6 +191,7 @@ try:
     seasonal, trend, residual = decompose(data_df1_series,
                                           chosen_target1)
 
+    # Test stationarity of target
     stationarity_data1 = test_stationarity(data_df1_series[chosen_target1])
 
     # Ljung-Box test for white noise
@@ -315,166 +315,194 @@ try:
                   help=help_white_noise)
 
     with correlation_tab:
-        if st.button("Correlate"):
-            st.subheader("Cross Correlation Plots")
-            st.caption("Interpretation: Positive correlation value means that the variables move in the same direction. "
-                     "On the other hand, negative correlation value means that the variables move in opposite directions.")
+        modes = ["Auto", "Manual"]
+        help_correlation = "Auto setting finds the lag that gives the highest positive/negative correlation automatically. " \
+                           "Manual mode allows the user to chose the lags manually."
+        correlation_mode = st.sidebar.selectbox("Choose method for finding the best correlation",
+                                                modes,
+                                                help=help_correlation)
 
-            modes = ["Auto", "Manual"]
-            help_correlation = "Auto setting finds the lag that gives the highest positive/negative correlation automatically. " \
-                               "Manual mode allows the user to chose the lags manually."
-            correlation_mode = st.sidebar.selectbox("Choose method for finding the best correlation",
-                                                    modes,
-                                                    help=help_correlation)
+        def find_best_lag(
+                df: pd.DataFrame,
+                var1: str,
+                var2: str,
+                alpha=0.05):
+            """
+            Returns the best lag for positive and negative correlation
+            :param df: pandas dataframe
+            :param var1: variable name for the first variable
+            :param var2: variable name for the second variable
+            :param alpha: value for significance threshold (default=0.05)
+            :return:
+            """
 
-            def find_best_lag(
-                    df: pd.DataFrame,
-                    var1: str,
-                    var2: str,
-                    alpha=0.05):
-                """
-                Returns the best lag for positive and negative correlation
-                :param df: pandas dataframe
-                :param var1: variable name for the first variable
-                :param var2: variable name for the second variable
-                :param alpha: value for significance threshold (default=0.05)
-                :return:
-                """
-                if stationarity_data1:
-                    x = df[var1]
-                    y = df[var2]
-                else:
-                    x = df[var1] - df[var1].shift(-1)
-                    y = df[var2] - df[var2].shift(-1)
-                res = []
-                for i in range(df[var1].shape[0] - 1):
-                    corr_res = [pearsonr(knn_imputer.fit_transform(x.values.reshape(-1, 1)).reshape(-1,),
-                                         knn_imputer.fit_transform(y.shift(periods=-1 * i).values.reshape(-1, 1)).reshape(-1,)),
-                                i]
-                    if corr_res[0][1] < alpha:
-                        res.append(corr_res)
+            stationarity_var1 = test_stationarity(df[var1])
+            stationarity_var2 = test_stationarity(df[var2])
 
-                res.sort()
-                best_positive_corr_lag = res[-2][1]
-                best_negative_corr_lag = res[0][1]
+            # Check stationarity of first variable
+            if stationarity_var1:
+                x = df[var1]
+            else:
+                x = df[var1] - df[var1].shift(-1)
 
-                return best_positive_corr_lag, best_negative_corr_lag
+            # Check stationarity of second variable
+            if stationarity_var2:
+                y = df[var2]
+            else:
+                y = df[var2] - df[var2].shift(-1)
 
 
-            def differenced_correlation(
-                    df: pd.DataFrame,
-                    target: str,
-                    feature: str,
-                    period: int
-            ):
-                if stationarity_data1:
-                    # If data is stationary, compute the correlation coefficient directly
-                    corr_user = pearsonr(df[target],
-                                         knn_imputer.fit_transform(df[feature].shift(periods=-1 * period).values.reshape(-1, 1)). reshape(-1,))
-                else:
-                    # Stationarize time series then calculate correlation
-                    differenced_target = df[target] - df[target].shift(-1)
-                    differenced_feature = df[feature] - df[feature].shift(-1)
-                    corr_user = pearsonr(knn_imputer.fit_transform(differenced_target.values.reshape(-1, 1)).reshape(-1,),
-                                         knn_imputer.fit_transform(differenced_feature.shift(periods=-1 * period).values.reshape(-1, 1)).reshape(-1,))
+            res = []
+            for i in range(df[var1].shape[0] - 1):
+                corr_res = [pearsonr(knn_imputer.fit_transform(x.values.reshape(-1, 1)).reshape(-1, ),
+                                     knn_imputer.fit_transform(y.shift(-i).values.reshape(-1, 1)).reshape(
+                                         -1, )),
+                            i]
+                if corr_res[0][1] < alpha:
+                    res.append(corr_res)
 
-                return corr_user
+            res.sort()
+            best_positive_corr_lag = res[-2][1]
+            best_negative_corr_lag = res[0][1]
 
-            def strength(x):
-                if abs(x) <= 0.3:
-                    return "Weak"
-                elif 0.3 < abs(x) <= 0.7:
-                    return "Moderate"
-                elif abs(x) > 0.7:
-                    return "Strong"
+            return best_positive_corr_lag, best_negative_corr_lag
 
-            def useful(x):
-                if x < 0.05:
-                    return "significant"
-                else:
-                    return "insignificant"
 
-            # Cross correlation plots
-            def make_correlation_plot(
-                    df: pd.DataFrame,
-                    target: str,
-                    feature: str,
-                    period: int,
-                    date: str,
-                    data_name: str,
-                    name: str):
-                """
-                Creates cross correlation and autocorrelation plots for time series data with corresponding lags
+        def differenced_correlation(
+                df: pd.DataFrame,
+                target: str,
+                feature: str,
+                period: int
+        ):
+            stationarity_target = test_stationarity(df[target])
+            stationarity_feature = test_stationarity(df[feature])
 
-                :param df: input data in dataframe
-                :param target: target name
-                :param feature: feature name
-                :param period: lag/shift to use
-                :param date: chosen date column
-                :param data_name: data name to be displayed in plot
-                :param name: for title of plot
-                :return: cross correlation and autocorrelation plot depending on the feature name
-                """
-                corr_user = differenced_correlation(df, target, feature, period)
+            # Check stationarity of feature
+            if stationarity_feature:
+                x = df[feature]
+            else:
+                x = df[feature] - df[feature].shift(-1)
 
-                fig = go.Figure()
-                fig.add_trace(go.Line(name=target,
-                                      x=df.index,
-                                      y=df[target]))
-                fig.add_trace(go.Line(name=data_name,
-                                      x=df.index,
-                                      y=df[feature].shift(periods=-1 * period)))
+            # Check stationarity of target
+            if stationarity_target:
+                y = df[target]
+            else:
+                y = df[target] - df[target].shift(-1)
 
-                fig.update_xaxes(gridcolor="grey")
-                fig.update_yaxes(gridcolor="grey")
-                fig.update_layout(xaxis_title=date,
-                                  yaxis_title="Data",
-                                  font_color="white",
-                                  paper_bgcolor="#2E3136",
-                                  plot_bgcolor="#2E3136",
-                                  colorway=["#7EE3C9", "#70B0E0"],
-                                  title=f"{name}: {round(corr_user[0], 2)} ({strength(corr_user[0])} "
-                                        f"and {useful(corr_user[1])})")
+            corr_user = pearsonr(knn_imputer.fit_transform(y.values.reshape(-1, 1)).reshape(-1, ),
+                                 knn_imputer.fit_transform(x.shift(periods=-1 * period).values.reshape(-1, 1)).reshape(-1, ))
 
-                st.plotly_chart(fig,
-                                use_container_width=True)
+            return corr_user
 
-            for feat in data_df1_series.columns:
-                lag_user = st.number_input(f"Cross correlation lag/shift for {feat}",
-                                           step=1,
-                                           key=feat)
-                if lag_user > 0:
-                    data_name = f"Shifted {feat}"
-                else:
-                    data_name = feat
 
-                if correlation_mode == 'Auto':
-                    pos_lag = find_best_lag(data_df1_series, chosen_target1, feat)[0]
-                    neg_lag = find_best_lag(data_df1_series, chosen_target1, feat)[1]
+        def strength(x):
+            if abs(x) <= 0.3:
+                return "Weak"
+            elif 0.3 < abs(x) <= 0.7:
+                return "Moderate"
+            elif abs(x) > 0.7:
+                return "Strong"
 
-                    st.markdown(f"<b><i>Use lag = {pos_lag} for best positive correlation "
-                                f"and lag = {neg_lag} for best negative correlation</b></i>",
-                                unsafe_allow_html=True)
+        def useful(x):
+            if x < 0.05:
+                return "significant"
+            else:
+                return "insignificant"
 
-                if feat == chosen_target1:
-                    name = "Autocorrelation"
-                    make_correlation_plot(data_df1_series,
-                                          chosen_target1,
-                                          feat,
-                                          lag_user,
-                                          chosen_date1,
-                                          data_name,
-                                          name)
+        # Cross correlation plots
+        def make_correlation_plot(
+                df: pd.DataFrame,
+                target: str,
+                feature: str,
+                period: int,
+                date: str,
+                data_name: str,
+                name: str):
+            """
+            Creates cross correlation and autocorrelation plots for time series data with corresponding lags
 
-                else:
-                    name = "Data Correlation"
-                    make_correlation_plot(data_df1_series,
-                                          chosen_target1,
-                                          feat,
-                                          lag_user,
-                                          chosen_date1,
-                                          data_name,
-                                          name)
+            :param df: input data in dataframe
+            :param target: target name
+            :param feature: feature name
+            :param period: lag/shift to use
+            :param date: chosen date column
+            :param data_name: data name to be displayed in plot
+            :param name: for title of plot
+            :return: cross correlation and autocorrelation plot depending on the feature name
+            """
+
+            corr_user = differenced_correlation(df, target, feature, period)
+
+            fig = make_subplots(specs=[[{"secondary_y": True}]])
+            fig.add_trace(go.Line(name=target,
+                                  x=df.index,
+                                  y=df[target]),
+                          secondary_y=True)
+            fig.add_trace(go.Line(name=data_name,
+                                  x=df.index,
+                                  y=df[feature].shift(periods=-1 * period)),
+                          secondary_y=False)
+
+            fig.update_xaxes(gridcolor="grey")
+            fig.update_yaxes(gridcolor="grey")
+            fig.update_yaxes(title_text=target,
+                             secondary_y=True,
+                             zeroline=False)
+            fig.update_yaxes(title_text=feature,
+                             secondary_y=False,
+                             zeroline=False)
+            fig.update_layout(xaxis_title=date,
+                              font_color="white",
+                              paper_bgcolor="#2E3136",
+                              plot_bgcolor="#2E3136",
+                              colorway=["#7EE3C9", "#70B0E0"],
+                              title=f"{name}: {round(corr_user[0], 2)} ({strength(corr_user[0])} "
+                                    f"and {useful(corr_user[1])})")
+
+            st.plotly_chart(fig,
+                            use_container_width=True)
+
+
+        st.subheader("Cross Correlation Plots")
+        st.caption("Interpretation: Positive correlation value means that the variables move in the same direction. "
+                 "On the other hand, negative correlation value means that the variables move in opposite directions.")
+
+        for feat in data_df1_series.columns:
+            lag_user = st.number_input(f"Cross correlation lag/shift for {feat}",
+                                       step=1,
+                                       key=feat)
+            if lag_user > 0:
+                data_name = f"Shifted {feat}"
+            else:
+                data_name = feat
+
+            if correlation_mode == 'Auto':
+                pos_lag = find_best_lag(data_df1_series, chosen_target1, feat)[0]
+                neg_lag = find_best_lag(data_df1_series, chosen_target1, feat)[1]
+
+                st.markdown(f"<b><i>Use lag = {pos_lag} for best positive correlation "
+                            f"and lag = {neg_lag} for best negative correlation</b></i>",
+                            unsafe_allow_html=True)
+
+            if feat == chosen_target1:
+                name = "Autocorrelation"
+                make_correlation_plot(data_df1_series,
+                                      chosen_target1,
+                                      feat,
+                                      lag_user,
+                                      chosen_date1,
+                                      data_name,
+                                      name)
+
+            else:
+                name = "Data Correlation"
+                make_correlation_plot(data_df1_series,
+                                      chosen_target1,
+                                      feat,
+                                      lag_user,
+                                      chosen_date1,
+                                      data_name,
+                                      name)
 
     with forecast_tab:
         # Create autoML model for forecasting
@@ -652,16 +680,6 @@ try:
         st.plotly_chart(fig,
                         use_container_width=True)
 
-
-        def rfe_select(n_features, X, y):
-            rfe = RFE(estimator=RandomForestRegressor(), n_features_to_select=n_features)
-            rfe_fit = rfe.fit(X, y)
-            features_ranking = rfe_fit.ranking_
-            rfe_results = pd.DataFrame(zip(features, features_ranking), columns=['Features', 'Ranking'])
-            rfe_results = rfe_results[rfe_results['Ranking'] == 1]
-            return rfe_results
-
-
         def fi_select(n_features, X, y):
             fi = ExtraTreesRegressor()
             fi.fit(X, y)
@@ -678,9 +696,7 @@ try:
 
         X_feat = data_imp_knn[features]
         y_feat = data_imp_knn[chosen_target1].values
-        # rfe_results = rfe_select(n_features, X_feat, y_feat)
         fi_results = fi_select(n_features, X_feat, y_feat)
-        # common_features = list(set(rfe_results['Features']).intersection(fi_results['Features']))
 
         fig_feat = go.Figure()
         fig_feat.add_trace(go.Bar(name='Feature Importance',
