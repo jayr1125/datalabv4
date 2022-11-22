@@ -467,7 +467,10 @@ try:
         st.caption("Interpretation: Positive correlation value means that the variables move in the same direction. "
                  "On the other hand, negative correlation value means that the variables move in opposite directions.")
 
-        for feat in data_df1_series.columns:
+        features_to_plot = st.multiselect("Select variable(s) to plot",
+                                          data_df1_series.columns)
+
+        for feat in features_to_plot:
             lag_user = st.number_input(f"Cross correlation lag/shift for {feat}",
                                        step=1,
                                        key=feat)
@@ -634,7 +637,7 @@ try:
             else:
                 st.caption("Interpretation: The table below shows the lagged version of the target variable(e.g., L1 means lag = 1), "
                            "and their coefficients (how much they influence, positive or negative, the change in the target variable).")
-                st.caption("NOTE: AR means autoregressive or the lagged/past version of the variable itself. While, MA means moving average.")
+                st.caption("NOTE: AR means autoregressive or the lagged/past version of the variable itself.")
                 model_uni = ARDL(data_df1_series, lags=5)
                 model_uni_fit = model_uni.fit()
                 eq = pd.DataFrame(zip(model_uni_fit.params.index, model_uni_fit.params.values, model_uni_fit.pvalues.values),
@@ -646,6 +649,11 @@ try:
                 st.write(eq)
 
         # Feature importance and ranking
+        st.caption("Interpretation: Feature importance is a value between 0 and 1. "
+                   "This is a metric of how important a feature is for prediction. "
+                   "The sum of all feature importance scores in a dataset is equal to 1.")
+
+        st.caption("The graph below shows the importance of the lagged versions of the target variable.")
         features = list(data_df1_series.columns.drop(chosen_target1).values)
 
         dat = pd.DataFrame()
@@ -665,7 +673,7 @@ try:
         fig = go.Figure()
         fig.add_trace(go.Bar(name="Feature importance",
                              x=names[::-1],
-                             y=model.feature_importances_[::-1]))
+                             y=np.round(model.feature_importances_[::-1], 4)))
 
         fig.update_xaxes(gridcolor="#2E3136")
         fig.update_yaxes(gridcolor="grey")
@@ -698,10 +706,11 @@ try:
         y_feat = data_imp_knn[chosen_target1].values
         fi_results = fi_select(n_features, X_feat, y_feat)
 
+        st.caption("The graph below shows the importance of every feature chosen from the dataset.")
         fig_feat = go.Figure()
         fig_feat.add_trace(go.Bar(name='Feature Importance',
                                   x=fi_results['Features'],
-                                  y=fi_results['Importance']))
+                                  y=np.round(fi_results['Importance'], 4)))
         fig_feat.update_xaxes(gridcolor="#2E3136")
         fig_feat.update_yaxes(gridcolor="grey")
         fig_feat.update_layout(xaxis_title=f"Features",
