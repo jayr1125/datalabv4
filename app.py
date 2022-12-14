@@ -164,7 +164,7 @@ try:
         :param value_col: target column of dataframe to test for seasonality
         :return: boolean True(w/ seasonality) or False(w/o seasonality) and array of seasonal periods present in data
         """
-        df = TimeSeries.from_dataframe(data_df1_series_dt,
+        df = TimeSeries.from_dataframe(data_df1_series_dt,  # check input to function
                                        time_col=time_col,
                                        value_cols=value_col,
                                        fill_missing_dates=True,
@@ -291,25 +291,30 @@ try:
 
         # Show descriptive statistics for file 1
         st.metric("No. of Variables",
-                  data_df1_shape[1])
+                  data_df1_shape[1],
+                  help="Number of columns/variables in the uploaded dataset.")
         st.metric("No. of Observations",
-                  data_df1_shape[0])
+                  data_df1_shape[0],
+                  help="Number of rows/observations in the uploaded dataset.")
         st.metric("Mean",
-                  mean_data1)
+                  mean_data1,
+                  help=f"Average value of {chosen_target1}.")
         st.metric("Median",
-                  median_data1)
+                  median_data1,
+                  help=f"Median value of {chosen_target1}.")
         st.metric("Standard Deviation",
-                  std_data1)
+                  std_data1,
+                  help=f"This measures how spread out {chosen_target1} is.")
         st.metric("Seasonality",
-                  seasonality)
+                  seasonality,
+                  help=f"Seasonality is the predictable fluctuation or pattern in {chosen_target1}.")
         help_stationary = "This tells whether the dataset has seasonality or trend. " \
                           "A dataset with trend or seasonality is not stationary"
         st.metric("Stationarity",
                   stationarity_data1,
                   help=help_stationary)
         help_white_noise = "The past values of the predictors cannot be used " \
-                           "to predict the future values if white noise is present." \
-                           " In other words, the time series uploaded is a random walk."
+                           "to predict the future values if white noise is present."
         st.metric("White Noise",
                   white_noise,
                   help=help_white_noise)
@@ -350,7 +355,6 @@ try:
                 y = df[var2]
             else:
                 y = df[var2] - df[var2].shift(-1)
-
 
             res = []
             for i in range(df[var1].shape[0] - 1):
@@ -394,14 +398,13 @@ try:
 
             return corr_user
 
-
         def strength(x):
             if abs(x) <= 0.3:
-                return "Weak"
+                return "weak"
             elif 0.3 < abs(x) <= 0.7:
-                return "Moderate"
+                return "moderate"
             elif abs(x) > 0.7:
-                return "Strong"
+                return "strong"
 
         def useful(x):
             if x < 0.05:
@@ -456,8 +459,8 @@ try:
                               paper_bgcolor="#2E3136",
                               plot_bgcolor="#2E3136",
                               colorway=["#7EE3C9", "#70B0E0"],
-                              title=f"{name}: {round(corr_user[0], 2)} ({strength(corr_user[0])} "
-                                    f"and {useful(corr_user[1])})")
+                              title=f"<b>{name} = {round(corr_user[0], 2)}</b>: The strength of relationship between {target} and {data_name} at lag = {period} "
+                                    f"is <b>{strength(corr_user[0])}</b> and <b>{useful(corr_user[1])}</b>")
 
             st.plotly_chart(fig,
                             use_container_width=True)
@@ -483,7 +486,7 @@ try:
                 pos_lag = find_best_lag(data_df1_series, chosen_target1, feat)[0]
                 neg_lag = find_best_lag(data_df1_series, chosen_target1, feat)[1]
 
-                st.markdown(f"<b><i>Excluding lag = 0, use lag = {pos_lag} for best positive correlation "
+                st.markdown(f"<b><i>Recommendation: Excluding lag = 0, use lag = {pos_lag} for best positive correlation "
                             f"and lag = {neg_lag} for best negative correlation</b></i>",
                             unsafe_allow_html=True)
 
@@ -566,13 +569,13 @@ try:
             # Forecast 1 plot
             fig5 = go.Figure()
             fig5.add_trace(go.Scatter(
-                name="Data",
+                name=chosen_target1,
                 x=data_df1_series.index,
                 y=data_df1_series[chosen_target1]
             ))
 
             fig5.add_trace(go.Scatter(
-                name='Prediction',
+                name='Forecast',
                 x=x_data1,
                 y=y_data1,
                 # mode='lines',
@@ -608,7 +611,7 @@ try:
                                font_color="white",
                                paper_bgcolor="#2E3136",
                                plot_bgcolor="#2E3136",
-                               title=f"{data1.name} Forecast using {model_name1}",
+                               title=f"{chosen_target1} Forecast using {model_name1}",
                                hovermode="x",
                                colorway=["#7EE3C9"])
 
@@ -616,8 +619,8 @@ try:
                             use_container_width=True)
 
             if len(chosen_features1) > 1:
-                st.caption("Interpretation: The table below shows the lagged version of the target and explanatory variables (e.g., L1 means lag = 1), "
-                           "and their coefficients (how much they influence, positive or negative, the change in the target variable).")
+                # st.caption("Interpretation: The table below shows the lagged version of the target and explanatory variables (e.g., L1 means lag = 1), "
+                #            "and their coefficients (how much they influence, positive or negative, the change in the target variable).")
 
                 mod = VAR(data_df1_series)
                 results = mod.fit(5)
@@ -633,34 +636,54 @@ try:
                 eqn = eqn[eqn['Significance'] <= 0.05]
                 eqn.drop('Significance', axis=1, inplace=True)
                 eqn.reset_index(drop=True, inplace=True)
-                st.write(eqn)
+                # st.write(eqn)
             else:
-                st.caption("Interpretation: The table below shows the lagged version of the target variable(e.g., L1 means lag = 1), "
-                           "and their coefficients (how much they influence, positive or negative, the change in the target variable).")
-                st.caption("NOTE: AR means autoregressive or the lagged/past version of the variable itself.")
+                # st.caption("Interpretation: The table below shows the lagged version of the target variable(e.g., L1 means lag = 1), "
+                #            "and their coefficients (how much they influence, positive or negative, the change in the target variable).")
+                # st.caption("NOTE: AR means autoregressive or the lagged/past version of the variable itself.")
                 model_uni = ARDL(data_df1_series, lags=5)
                 model_uni_fit = model_uni.fit()
-                eq = pd.DataFrame(zip(model_uni_fit.params.index, model_uni_fit.params.values, model_uni_fit.pvalues.values),
+                eqn = pd.DataFrame(zip(model_uni_fit.params.index, model_uni_fit.params.values, model_uni_fit.pvalues.values),
                                   columns=['Variables', 'Coefficients', 'Significance'])
-                eq = eq[1:-1]
-                eq = eq[eq['Significance'] <= 0.05]
-                eq.drop('Significance', axis=1, inplace=True)
-                eq.reset_index(drop=True, inplace=True)
-                st.write(eq)
+                eqn = eqn[1:-1]
+                eqn = eqn[eqn['Significance'] <= 0.05]
+                eqn.drop('Significance', axis=1, inplace=True)
+                eqn.reset_index(drop=True, inplace=True)
+                # st.write(eqn)
+
+            coefs = round(eqn['Coefficients'], 2)
+            var = eqn['Variables']
+            dic = dict(zip(var, coefs))
+
+
+            def polarity(n):
+                if n > 0:
+                    return "increase"
+                elif n < 0:
+                    return "decrease"
+                else:
+                    return "no change"
+
+            sentences = []
+            for i, j in dic.items():
+                sentences.append(f"a {j} {polarity(j)} by {i}, ")
+
+            st.write("INTERPRETATION: ",
+                     " ".join(sentences),
+                     f"predicts {chosen_target1}")
 
         # Feature importance and ranking
         st.caption("Interpretation: Feature importance is a value between 0 and 1. "
                    "This is a metric of how important a feature is for prediction. "
                    "The sum of all feature importance scores in a dataset is equal to 1.")
 
-        st.caption("The graph below shows the importance of the lagged versions of the target variable.")
         features = list(data_df1_series.columns.drop(chosen_target1).values)
 
         dat = pd.DataFrame()
         for i in range(25, 0, -1):
-            dat['t-' + str(i)] = data_df1_series.shift(i).values[:, 0]
+            dat['Lag ' + str(i)] = data_df1_series.shift(i).values[:, 0]
 
-        dat['t-'] = data_df1_series.values[:, 0]
+        dat['Lag '] = data_df1_series.values[:, 0]
         dat = dat[25:]
         array = dat.values
         x = array[:, 0:-1]
@@ -688,6 +711,10 @@ try:
         st.plotly_chart(fig,
                         use_container_width=True)
 
+        st.caption(f"The graph above shows the importance of the lagged versions of {chosen_target1}. "
+                   f"With {chosen_target1} at {names[np.argmax(model.feature_importances_)]} "
+                   f"being the most important in predicting the future values of {chosen_target1}.")
+
         def fi_select(n_features, X, y):
             fi = ExtraTreesRegressor()
             fi.fit(X, y)
@@ -706,7 +733,6 @@ try:
         y_feat = data_imp_knn[chosen_target1].values
         fi_results = fi_select(n_features, X_feat, y_feat)
 
-        st.caption("The graph below shows the importance of every feature chosen from the dataset.")
         fig_feat = go.Figure()
         fig_feat.add_trace(go.Bar(name='Feature Importance',
                                   x=fi_results['Features'],
@@ -723,6 +749,19 @@ try:
 
         st.plotly_chart(fig_feat,
                         use_container_width=True)
+
+        st.caption("The graph above shows the importance of every feature chosen from the dataset. "
+                   f"With {fi_results['Features'][np.argmax(fi_results['Importance'])]} being the most important in "
+                   f"predicting the future values of {chosen_target1}.")
+
+    # def convert_df(df):
+    #     return df.to_csv().encode('utf-8')
+
+    # csv = convert_df(data_df1_series)
+    # st.download_button(label="Download dataset",
+    #                    data=csv,
+    #                    file_name="Datalab Data.csv",
+    #                    mime="text/csv",)
 
 except (NameError, IndexError, KeyError, ValueError) as e:
     pass
