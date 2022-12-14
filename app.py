@@ -666,7 +666,7 @@ try:
 
             sentences = []
             for i, j in dic.items():
-                sentences.append(f"a {j} {polarity(j)} by {i}, ")
+                sentences.append(f"a {abs(j)} {polarity(j)} in {i}, ")
 
             st.write("INTERPRETATION: ",
                      " ".join(sentences),
